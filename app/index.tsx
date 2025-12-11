@@ -1,0 +1,168 @@
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { Image, ImageBackground, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { getCotizaciones } from "../src/api/getCotizaciones";
+import bgImage from "../src/assets/images/background-UR.png";
+import LogoArg from "../src/assets/images/logo-moneda-argentino.png";
+import LogoDolar from "../src/assets/images/logo-moneda-dolar.png";
+import LogoEuro from "../src/assets/images/logo-moneda-euro.png";
+import LogoReal from "../src/assets/images/logo-moneda-real.png";
+import tagArg from "../src/assets/images/tag-argentinos.png";
+import tagDolar from "../src/assets/images/tag-dolares.png";
+import tagEuro from "../src/assets/images/tag-euros.png";
+import tagReal from "../src/assets/images/tag-reales.png";
+import titulo from "../src/assets/images/titulo.png";
+import styles from "../src/styles/style.jsx";
+
+
+
+export default function Index() {
+  const [divisaNum, setDivisaNum] = useState< 0 | 1 | 2 | 3>(1)
+  const divisasList = ["usd", "rbr", "eur", "ars"]
+  const divisasListNames = ["Dólares (U$D)", "Reales (R$)", "Euros (€)", "Peso Argentino (AR$)"]
+  const tags = [tagDolar, tagReal, tagEuro, tagArg]
+  const [divisaName, setDivisaName] = useState<(typeof divisasListNames)[number]>(divisasListNames[1]);
+  const [monedaEx, setMonedaEx] = useState(1);
+  const [pesos, setPesos] = useState(1);
+  const [editing, setEditing] = useState<"ex" | "uyu" | null>(null);
+  const [rates, setRates] = useState<Rates | null>(null);
+  const safeParse = (text: string) => {
+    const normalized = text.replace(",", ".");
+    const num = parseFloat(normalized);
+    return isNaN(num) ? null : num;
+  };
+  const [select, setSelect] = useState(undefined);
+  const [typing, setTyping] = useState(false)
+  
+  useEffect(() => {
+    async function load() {
+      const data = await getCotizaciones();
+      setRates(data);
+      setPesos(data[divisasList[divisaNum]])
+    }
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!rates) return;
+    setMonedaEx(1)
+    setPesos(rates[divisasList[divisaNum]] ?? 0);
+    setDivisaName(divisasListNames[divisaNum]);
+  }, [divisaNum]);
+
+  function setToZero() {
+    setPesos(0);
+    setMonedaEx(0);
+  }
+
+  
+
+
+  return (
+    <ImageBackground source={bgImage} style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light"></StatusBar>
+      
+      <View style={{alignItems: "center"}}>
+        <Image source={titulo} style={{ width: 250, height: 80 }}></Image>
+      </View>
+
+      <View style={{alignItems: "center"}}>
+          <Image source={tags[divisaNum]} style={{ width: 110, height: 80 }}></Image>
+      </View>
+
+      <View style={{ paddingTop: 25, flex:1 }}>
+        
+        {/* MONEDA EXTRANJERA */}
+        <View style={styles.inputBox}>
+          <Text style={styles.label}>{divisaName}</Text>
+          <TextInput
+            style={styles.numberText}
+            keyboardType="decimal-pad"
+            value={monedaEx.toString()}
+            onFocus={() => {setEditing("ex")}}
+            onChangeText={(text) => {
+              if (editing !== "ex") return;
+              const num = safeParse(text);
+              setMonedaEx(text);
+              if (num !== null) {
+                const operationNum = safeParse(rates?.[divisasList[divisaNum]])
+                setPesos(num*operationNum);
+              }
+            }}
+            onBlur={() => {
+              if (isNaN(monedaEx) || !monedaEx) {
+                  setToZero()
+              }
+              setEditing(null);
+              }
+            }
+          />
+        </View>
+
+        {/* PESOS URUGUAYOS */}
+        <View style={styles.inputBox}>
+          <Text style={styles.label}>Pesos Uruguayos ($UYU)</Text>
+          <TextInput
+            style={styles.numberText}
+            keyboardType="decimal-pad"
+            selectTextOnFocus={true}
+            value={pesos.toString()}
+            selection={select}
+            onFocus={() => {setEditing("uyu"), setSelect({start: 0, end: pesos.toString().length}), setTyping(true)}}
+            onChangeText={(text) => {
+              if (editing !== "uyu") return;
+              if (typing){
+                setSelect({start: pesos.toString().length+1, end: pesos.toString().length+1})
+                setTyping(false)
+              }
+              else {setSelect(undefined)}
+              const num = safeParse(text);
+              setPesos(text);
+              if (num !== null) {
+                const operationNum = safeParse(rates?.[divisasList[divisaNum]])
+                setMonedaEx(num/operationNum);
+              }}}
+              onBlur={() => {
+                if (isNaN(pesos) || !pesos) {
+                  setToZero()
+                }
+                setSelect(undefined)
+                setEditing(null);
+              }
+            }
+          />
+        </View>
+
+        <View style={{alignItems: "center"}}>
+          <Text style={{color: "white"}}>Cotizaciones actualizadas BROU</Text>
+        </View>
+
+        {/* DIVISAS */}
+        <View style={{
+          flex: 1,
+          justifyContent: "flex-end",
+          alignItems: "center",
+          paddingBottom: Platform.OS === "android" ? 60 : 30
+          }}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity onPress={() => setDivisaNum(0)}>
+                <Image source={LogoDolar} style={{ width: 80, height: 80 }}></Image>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setDivisaNum(1)}>
+              <Image source={LogoReal} style={{ width: 80, height: 80 }}></Image>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setDivisaNum(2)}>
+              <Image source={LogoEuro} style={{ width: 80, height: 80 }}></Image>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setDivisaNum(3)}>
+              <Image source={LogoArg} style={{ width: 80, height: 80 }}></Image>
+            </TouchableOpacity>
+            </View>
+        </View>
+
+      </View>
+    </ImageBackground>
+  );
+}
